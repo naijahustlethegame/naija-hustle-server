@@ -9,6 +9,7 @@
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    
     "outDir": "dist",
     "rootDir": "src",
     "target": "esnext",
