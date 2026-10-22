@@ -1,14 +1,34 @@
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
-
+import rateLimit from "express-rate-limit";
+import { ZodError } from "zod";
+import { env } from "./config/env.js";
+import { ApiError } from "./lib/supabase.js";
+import { requireAuth } from "./middleware/auth.js";
+import { player } from "./routes/player.js";
+import { runs } from "./routes/runs.js";
+import { sellers } from "./routes/sellers.js";
+import { leaderboard } from "./routes/leaderboard.js";
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(helmet());
-app.use(cors({ origin: process.env.WEB_ORIGIN?.split(",") ?? true }));
-app.use(express.json({ limit: "100kb" }));
+app.use(cors({ origin: env.WEB_ORIGIN?.split(",") ?? true }));
+app.use(express.json({ limit: "20kb" }));
+app.use(rateLimit({ windowMs: 60_000, limit: 120, validate: false }));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
-// app.use("/sync", requireAuth, syncRouter);  // add as you build routes
+app.use("/leaderboard", leaderboard);
+app.use("/player", requireAuth, player);
+app.use("/runs", requireAuth, runs);
+app.use("/sellers", requireAuth, sellers);
+
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof ZodError) return res.status(400).json({ error: "Invalid request" });
+  if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+  console.error(err);
+  res.status(500).json({ error: "Server error" });
+});
 
 export default app;
