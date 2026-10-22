@@ -1,6 +1,6 @@
 import type { Server } from "node:http";
 import { WebSocketServer } from "ws";
-import { addClient, handleRoomMessage, removeClient } from "./rooms";
+import { addClient, handleRoomMessage, removeClient } from "./rooms.js";
 
 /** Call once with your existing http server: attachPresence(server). Presence count plus game rooms. */
 export function attachPresence(server: Server) {
