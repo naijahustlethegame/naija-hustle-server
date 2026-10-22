@@ -95,7 +95,9 @@ function resolve(r: Room, key: string, k: Claim) {
   if (k.winner) return;
   const ids = [...k.open.keys()].filter((id) => [...r.clients].some((c) => c.id === id));
   if (!ids.length) { r.claims.delete(key); return; }
-  k.winner = ids[Math.floor(Math.random() * ids.length)];
+    const winner = ids[Math.floor(Math.random() * ids.length)];
+  if (!winner) { r.claims.delete(key); return; }
+  k.winner = winner;
   cast(r, { type: "claimResult", key, winner: k.winner, losers: ids.filter((i) => i !== k.winner) });
   // forget old claims so the map never grows
   const now = Date.now();
