@@ -63,12 +63,15 @@ player.post("/sales", async (req, res) => {
   res.json({ money: p.money, stock: p.stock });
 });
 
-/** Officer hit on the junction: the fine is fixed on the server. */
+/** Officer hits and items lost on the junction: the fine is fixed on the server. */
 player.post("/hit", async (req, res) => {
+  const b = z.object({ hits: z.number().int().min(0).max(5).default(0), items: z.record(itemId, z.number().int().min(0).max(5)).default({}) }).parse(req.body);
+  if (Object.values(b.items).reduce((a, n) => a + n, 0) > 10) throw new ApiError(400, "Invalid");
   const { data } = await db.from("players").select("money").eq("id", req.uid).single();
-  const loss = Math.min(data?.money ?? 0, 50);
-  const p = await rpc("apply_delta", { p_id: req.uid, p_money: -loss });
-  res.json({ money: p.money });
+  const loss = Math.min(data?.money ?? 0, 50 * b.hits);
+  const stock = Object.fromEntries(Object.entries(b.items).map(([k, n]) => [k, -n]));
+  const p = await rpc("apply_delta", { p_id: req.uid, p_money: -loss, p_stock: stock });
+  res.json({ money: p.money, stock: p.stock });
 });
 
 export { STORAGE_CAP };
