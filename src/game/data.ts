@@ -59,3 +59,10 @@ export function rollMarket(j: JunctionId, avoid?: string): Market {
   const opts = pool.filter((m) => m.id !== avoid);
   return opts[Math.floor(Math.random() * opts.length)]!;
 }
+
+/**
+ * Invite rewards. A friend counts once they have sold `salesToQualify` items, so fake sign-ups that never play pay nothing.
+ * 2,000 is two thirds of the starting cash and a bit over a first seller (Tunde, 1,500), but the lifetime cap
+ * (10 friends = 20,000) keeps invites from replacing the game: the Lekki junction alone costs 50,000.
+ */
+export const REFERRAL = { inviterReward: 2000, inviteeReward: 1000, salesToQualify: 30, maxPaid: 10 };
