@@ -6,13 +6,33 @@ import { requireAuth } from "../middleware/auth.js";
 
 /**
  * Ranked by money in hand (players.money). Stock, unbanked pots and sellers' pending earnings do not count,
- * so the board moves when you bank, sell, pay a fine or buy something. Only players who picked a name are listed;
- * the rest are anonymous visitors and would just fill the board.
+ * so the board moves when you bank, sell, pay a fine or buy something. Every player gets a generated name like
+ * "Player0417" when they first join, and can change it on the leaderboard page.
  */
 export const leaderboard = Router();
 const TOP_N = 50;
 
 type Row = { name: string; money: number };
+
+/** "Player" plus four digits taken from the player's id, so the same player always gets the same name. Not unique. */
+export function defaultName(uid: string) {
+  let h = 2166136261;
+  for (let i = 0; i < uid.length; i++) { h ^= uid.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return `Player${String((h >>> 0) % 10000).padStart(4, "0")}`;
+}
+
+/** Give a player the generated name if they have none yet. Never throws: a missing name must not break signing in. */
+export async function ensureDefaultName(uid: string): Promise<string> {
+  try {
+    const { data } = await db.from("players").select("name").eq("id", uid).maybeSingle();
+    if (!data) return "";
+    if (data.name) return data.name;
+    const name = defaultName(uid);
+    await db.from("players").update({ name }).eq("id", uid);
+    cache = null;
+    return name;
+  } catch { return ""; }
+}
 let cache: { at: number; top: Row[] } | null = null;
 
 async function top(): Promise<Row[]> {
@@ -32,7 +52,7 @@ leaderboard.get("/me", requireAuth, async (req, res) => {
   const { data: me, error } = await db.from("players").select("name,money").eq("id", req.uid).maybeSingle();
   if (error) throw new ApiError(500, "Server error");
   if (!me) throw new ApiError(404, "No player");
-  const money = Number(me.money), name: string = me.name ?? "";
+  const money = Number(me.money), name: string = me.name || (await ensureDefaultName(req.uid)); // players from before names existed get one here
   let rank: number | null = null;
   if (name) {
     const { count, error: e2 } = await db.from("players").select("id", { count: "exact", head: true }).neq("name", "").gt("money", money);

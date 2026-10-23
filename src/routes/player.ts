@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { ITEM_IDS, JUNCTIONS, MAX_PRICE_MULT, ITEM_PRICE, STORAGE_CAP, TRAY_CAP } from "../game/data.js";
 import { ApiError, db, rpc } from "../lib/supabase.js";
+import { ensureDefaultName } from "./leaderboard.js";
 
 export const player = Router();
 const itemId = z.enum(ITEM_IDS as [string, ...string[]]);
@@ -21,6 +22,7 @@ async function snapshot(uid: string) {
 player.post("/init", async (req, res) => {
   const b = z.object({ name: z.string().max(40).optional(), avatar: z.record(z.string(), z.any()).optional() }).parse(req.body ?? {});
   await rpc("ensure_player", { p_id: req.uid, p_name: b.name ?? "", p_avatar: b.avatar ?? {} });
+  await ensureDefaultName(req.uid); // Player0417-style name, so everyone is on the leaderboard from the start
   res.json(await snapshot(req.uid));
 });
 
