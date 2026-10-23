@@ -20,9 +20,11 @@ export const JUNCTION_UNLOCKS: Partial<Record<JunctionId, { price: number; requi
   obalende: { price: 15000 },
   lekki: { price: 50000, requires: "obalende" },
 };
-export const ITEM_PACKS: Record<string, { price: number; items: ItemId[]; requiresJunction?: JunctionId }> = {
-  tech: { price: 6000, items: ["charger", "gadget"] },
-  luxury: { price: 25000, items: ["shades", "perfume"], requiresJunction: "lekki" },
+/** Items come with the place they are sold. Owning a junction means owning its items; there is no separate purchase. */
+export const JUNCTION_ITEMS: Record<JunctionId, ItemId[]> = {
+  ojuelegba: ["water", "drink", "snack", "fruit", "bread"],
+  obalende: ["charger", "gadget"],
+  lekki: ["shades", "perfume"],
 };
 /** Better junctions have faster roads, so a run there can pick things up a little faster. */
 export const TIER: Record<JunctionId, 1 | 2 | 3> = { ojuelegba: 1, obalende: 2, lekki: 3 };
