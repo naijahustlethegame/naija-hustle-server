@@ -15,7 +15,7 @@ export async function rpc<T = any>(fn: string, args: Record<string, unknown>): P
   const { data, error } = await db.rpc(fn, args);
   if (error) {
     const m = error.message ?? "";
-    if (/check constraint|violates|pot_exists|storage_full|no_pot|no_player|duplicate key/i.test(m)) throw new ApiError(409, "Not allowed");
+    if (/check constraint|violates|pot_exists|storage_full|no_pot|no_player|duplicate key|locked|already_unlocked|not_enough_money/i.test(m)) throw new ApiError(409, "Not allowed");
     throw new ApiError(500, "Server error");
   }
   return data as T;

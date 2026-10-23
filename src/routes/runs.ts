@@ -1,16 +1,17 @@
 import { Router } from "express";
 import { z } from "zod";
-import { ITEM_IDS, MAX_LEVEL, STORAGE_CAP, fineFor, marketById, rollMarket, type ItemId } from "../game/data.js";
+import { ITEM_IDS, MAX_LEVEL, PICKUPS_PER_SEC, STORAGE_CAP, TIER, fineFor, marketById, rollMarket, type ItemId } from "../game/data.js";
 import { ApiError, db, rpc } from "../lib/supabase.js";
 
 export const runs = Router();
-const MIN_RUN_SECS = 8;      // fastest a real run can finish
-const PICKUPS_PER_SEC = 1.5; // generous upper bound on pickups per second
+const MIN_RUN_SECS = 25;     // fastest a real run can finish (about 46 seconds normally, a bit under 35 at the highest risk level)
+// generous upper bound on pickups per second: see PICKUPS_PER_SEC in game/data.ts (faster roads allow a few more)
 
 /** Pay the entry fee and get a market. The server chooses it. */
 runs.post("/start", async (req, res) => {
-  const { data: pl } = await db.from("players").select("junction,money").eq("id", req.uid).single();
+  const { data: pl } = await db.from("players").select("junction,money,unlocked_junctions").eq("id", req.uid).single();
   if (!pl) throw new ApiError(404, "No player");
+  if (!pl.unlocked_junctions?.includes(pl.junction)) throw new ApiError(409, "Junction not unlocked");
   const m = rollMarket(pl.junction);
   if (pl.money < m.fee) throw new ApiError(402, "Not enough money");
   const p = await rpc("start_run", { p_id: req.uid, p_market: m.id, p_fee: m.fee }); // creates the pot: running, started now
@@ -35,14 +36,16 @@ runs.post("/finish", async (req, res) => {
   const { data: pot } = await db.from("pots").select("*").eq("player_id", req.uid).eq("running", true).maybeSingle();
   if (!pot) throw new ApiError(409, "No run in progress");
   const m = marketById(pot.market)!;
+  const { data: pl } = await db.from("players").select("unlocked_items").eq("id", req.uid).single();
+  const mine: string[] = pl?.unlocked_items ?? [];
   const level = Math.min(MAX_LEVEL, Math.max(1, pot.level + 1));
   const secs = (Date.now() - new Date(pot.started_at).getTime()) / 1000;
   if (secs < MIN_RUN_SECS) throw new ApiError(400, "Run too short");
 
-  const maxPickups = Math.ceil(secs * PICKUPS_PER_SEC) + 3;
+  const maxPickups = Math.ceil(secs * PICKUPS_PER_SEC[TIER[m.junction]]) + 3;
   let units = 0;
   for (const [k, n] of Object.entries(items)) {
-    if (n > 0 && !m.items.includes(k as ItemId)) throw new ApiError(400, "Invalid item");
+    if (n > 0 && (!m.items.includes(k as ItemId) || !mine.includes(k))) throw new ApiError(400, "Invalid item");
     units += n;
   }
   if (units > maxPickups * level || cash > maxPickups * m.maxCash * level) throw new ApiError(400, "Invalid result");

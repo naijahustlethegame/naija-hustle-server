@@ -9,6 +9,7 @@ import { requireAuth } from "./middleware/auth.js";
 import { player } from "./routes/player.js";
 import { runs } from "./routes/runs.js";
 import { sellers } from "./routes/sellers.js";
+import { unlocks } from "./routes/unlocks.js";
 import { leaderboard } from "./routes/leaderboard.js";
 
 const app = express();
@@ -23,6 +24,7 @@ app.use("/leaderboard", leaderboard);
 app.use("/player", requireAuth, player);
 app.use("/runs", requireAuth, runs);
 app.use("/sellers", requireAuth, sellers);
+app.use("/unlocks", requireAuth, unlocks);
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ZodError) return res.status(400).json({ error: "Invalid request" });

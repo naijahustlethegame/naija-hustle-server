@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { ITEM_IDS, JUNCTIONS, MAX_PRICE_MULT, ITEM_PRICE, MIN_FEE, RELIEF_STOCK, STORAGE_CAP, TRAY_CAP } from "../game/data.js";
+import { ITEM_IDS, JUNCTIONS, MAX_PRICE_MULT, ITEM_PRICE, STORAGE_CAP, TRAY_CAP } from "../game/data.js";
 import { ApiError, db, rpc } from "../lib/supabase.js";
 
 export const player = Router();
@@ -9,16 +9,11 @@ const counts = z.record(itemId, z.number().int().min(0).max(1000));
 
 async function snapshot(uid: string) {
   const [p, s, pot] = await Promise.all([
-    db.from("players").select("id,name,avatar,money,junction,stock,storage").eq("id", uid).single(),
+    db.from("players").select("id,name,avatar,money,junction,stock,storage,unlocked_junctions,unlocked_items").eq("id", uid).single(),
     db.from("player_sellers").select("seller_id,since").eq("player_id", uid),
     db.from("pots").select("*").eq("player_id", uid).maybeSingle(),
   ]);
   if (p.error) throw new ApiError(404, "No player");
-  const have = (o: Record<string, number> | null) => Object.values(o ?? {}).reduce((a, b) => a + b, 0);
-  if (!pot.data && Number(p.data.money) < MIN_FEE && have(p.data.stock) + have(p.data.storage) === 0) {
-    const g = await rpc("apply_delta", { p_id: uid, p_stock: {}, p_storage: RELIEF_STOCK });
-    return { ...p.data, storage: g.storage, sellers: s.data ?? [], pot: null };
-  }
   return { ...p.data, sellers: s.data ?? [], pot: pot.data ?? null };
 }
 
@@ -33,7 +28,7 @@ player.get("/", async (req, res) => res.json(await snapshot(req.uid)));
 
 player.post("/junction", async (req, res) => {
   const { junction } = z.object({ junction: z.enum(JUNCTIONS) }).parse(req.body);
-  await rpc("set_junction", { p_id: req.uid, p_junction: junction });
+  await rpc("set_junction", { p_id: req.uid, p_junction: junction }); // refuses a junction you have not unlocked
   res.json({ junction });
 });
 
