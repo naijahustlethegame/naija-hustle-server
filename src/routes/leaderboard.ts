@@ -13,17 +13,24 @@ export const leaderboard = Router();
 const TOP_N = 50;
 
 type Row = { name: string; money: number };
+let cache: { at: number; top: Row[] } | null = null;
 
-/** "Player" plus four digits taken from the player's id, so the same player always gets the same name. Not unique. */
+/** Fallback only: "Player" plus four digits from the player's id. Not unique. */
 export function defaultName(uid: string) {
   let h = 2166136261;
   for (let i = 0; i < uid.length; i++) { h ^= uid.charCodeAt(i); h = Math.imul(h, 16777619); }
   return `Player${String((h >>> 0) % 10000).padStart(4, "0")}`;
 }
 
-/** Give a player the generated name if they have none yet. Never throws: a missing name must not break signing in. */
+/**
+ * Give a player a generated name if they have none yet. The database hands out sequential ones (Player0001, Player0002...)
+ * through ensure_default_name (see supabase/player_numbers.sql). Until that is installed, fall back to a name made from
+ * the player's id so nothing breaks. Never throws: a missing name must not stop anybody signing in.
+ */
 export async function ensureDefaultName(uid: string): Promise<string> {
   try {
+    const r = await db.rpc("ensure_default_name", { p_id: uid });
+    if (!r.error && typeof r.data === "string" && r.data) { cache = null; return r.data; }
     const { data } = await db.from("players").select("name").eq("id", uid).maybeSingle();
     if (!data) return "";
     if (data.name) return data.name;
@@ -33,7 +40,6 @@ export async function ensureDefaultName(uid: string): Promise<string> {
     return name;
   } catch { return ""; }
 }
-let cache: { at: number; top: Row[] } | null = null;
 
 async function top(): Promise<Row[]> {
   if (cache && Date.now() - cache.at < 10_000) return cache.top;
