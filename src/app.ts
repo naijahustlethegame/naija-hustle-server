@@ -11,6 +11,7 @@ import { runs } from "./routes/runs.js";
 import { sellers } from "./routes/sellers.js";
 import { unlocks } from "./routes/unlocks.js";
 import { leaderboard } from "./routes/leaderboard.js";
+import { referrals } from "./routes/referrals.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -25,6 +26,7 @@ app.use("/player", requireAuth, player);
 app.use("/runs", requireAuth, runs);
 app.use("/sellers", requireAuth, sellers);
 app.use("/unlocks", requireAuth, unlocks);
+app.use("/referrals", requireAuth, referrals);
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ZodError) return res.status(400).json({ error: "Invalid request" });
