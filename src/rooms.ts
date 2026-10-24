@@ -46,10 +46,10 @@ function roster(r: Room) {
 }
 
 // ---------- power-ups ----------
-// Rare and rewarding: sparse spawns, shield uncommon, longer horn/pothole.
+// Still rewarding, but a bit more frequent than before (was 16-28s between spawns): shield uncommon, longer horn/pothole.
 const PICKUP_TTL_MS = 10000;
-const SPAWN_MIN_MS = 16000;
-const SPAWN_MAX_MS = 28000;
+const SPAWN_MIN_MS = 11000;
+const SPAWN_MAX_MS = 20000;
 const MAX_PICKUPS = 1;
 const TRAP_TTL_MS = 25000, TRAP_RX = 30, TRAP_RY = 22;
 const HORN_RADIUS = 230;
