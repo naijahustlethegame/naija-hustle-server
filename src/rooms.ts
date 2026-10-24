@@ -139,3 +139,18 @@ setInterval(() => {
     cast(r, { type: "snap", p: seats(r).map((c) => [c.id, Math.round(c.x), Math.round(c.y), c.s]) });
   }
 }, TICK_MS).unref();
+
+/** A snapshot for the admin page: how many rooms are open, who is seated, who is only watching. */
+export function liveStats() {
+  const byJunction: Record<string, { rooms: number; seated: number }> = Object.fromEntries(JUNCTIONS.map((j) => [j, { rooms: 0, seated: 0 }]));
+  let seated = 0, watching = 0;
+  const list: { id: string; junction: string; seated: number; watching: number }[] = [];
+  for (const r of rooms.values()) {
+    const n = seats(r).length, w = r.clients.size - n;
+    seated += n; watching += w;
+    byJunction[r.junction]!.rooms++; byJunction[r.junction]!.seated += n;
+    list.push({ id: r.id, junction: r.junction, seated: n, watching: w });
+  }
+  list.sort((a, b) => b.seated - a.seated);
+  return { rooms: rooms.size, seated, watching, cap: ROOM_CAP, byJunction, list: list.slice(0, 20) };
+}
