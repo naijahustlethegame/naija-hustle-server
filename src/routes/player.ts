@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { ITEM_IDS, JUNCTIONS, MAX_PRICE_MULT, ITEM_PRICE, STORAGE_CAP, TRAY_CAP } from "../game/data.js";
+import { ITEM_IDS, JUNCTIONS, MAX_PRICE_MULT, ITEM_PRICE, REFERRAL, STORAGE_CAP, TRAY_CAP } from "../game/data.js";
 import { ApiError, db, rpc } from "../lib/supabase.js";
 import { ensureDefaultName } from "./leaderboard.js";
 
@@ -62,6 +62,8 @@ player.post("/sales", async (req, res) => {
     money += s.price; stock[s.item] = (stock[s.item] ?? 0) - 1;
   }
   const p = await rpc("apply_delta", { p_id: req.uid, p_money: money, p_stock: stock });
+  // Count these sales toward an invite reward, if this player was invited. Never blocks or fails the sale.
+  void rpc("referral_progress", { p_invitee: req.uid, p_sales: sales.length, p_need: REFERRAL.salesToQualify, p_inviter_reward: REFERRAL.inviterReward, p_invitee_reward: REFERRAL.inviteeReward, p_max_paid: REFERRAL.maxPaid }).catch(() => {});
   res.json({ money: p.money, stock: p.stock });
 });
 
