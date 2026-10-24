@@ -12,6 +12,7 @@ import { sellers } from "./routes/sellers.js";
 import { unlocks } from "./routes/unlocks.js";
 import { leaderboard } from "./routes/leaderboard.js";
 import { referrals } from "./routes/referrals.js";
+import { radio } from "./routes/radio.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -22,6 +23,7 @@ app.use(rateLimit({ windowMs: 60_000, limit: 120, validate: false }));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/leaderboard", leaderboard);
+app.use("/radio", radio);
 app.use("/player", requireAuth, player);
 app.use("/runs", requireAuth, runs);
 app.use("/sellers", requireAuth, sellers);
