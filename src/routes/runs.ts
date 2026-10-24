@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { ITEM_IDS, MAX_LEVEL, PICKUPS_PER_SEC, STORAGE_CAP, TIER, fineFor, marketById, rollMarket, type ItemId } from "../game/data.js";
 import { ApiError, db, rpc } from "../lib/supabase.js";
+import { logRun } from "../lib/runLog.js";
 
 export const runs = Router();
 const MIN_RUN_SECS = 25;     // fastest a real run can finish (about 46 seconds normally, a bit under 35 at the highest risk level)
@@ -15,6 +16,7 @@ runs.post("/start", async (req, res) => {
   const m = rollMarket(pl.junction);
   if (pl.money < m.fee) throw new ApiError(402, "Not enough money");
   const p = await rpc("start_run", { p_id: req.uid, p_market: m.id, p_fee: m.fee }); // creates the pot: running, started now
+  logRun(req.uid, m.id, 1, "started");
   res.json({ market: m.id, fee: m.fee, money: p.money, room: Math.max(0, STORAGE_CAP - Object.values<number>(p.storage).reduce((a, b) => a + b, 0)) });
 });
 
@@ -22,6 +24,7 @@ runs.post("/start", async (req, res) => {
 runs.post("/push", async (req, res) => {
   const pot = await rpc("push_on", { p_id: req.uid });
   if (!pot?.player_id) throw new ApiError(409, "Nothing to push");
+  logRun(req.uid, pot.market, pot.level + 1, "started");
   res.json({ level: pot.level + 1 });
 });
 
@@ -52,18 +55,23 @@ runs.post("/finish", async (req, res) => {
 
   const p = await rpc("finish_run", { p_id: req.uid, p_items: items, p_cash: cash, p_level: level });
   if (!p?.player_id) throw new ApiError(409, "No run in progress");
+  logRun(req.uid, m.id, level, "completed", cash);
   res.json({ pot: p });
 });
 
 /** Caught, or the page closed mid-run: pot is lost and the fine is fixed by the market. */
 runs.post("/fail", async (req, res) => {
-  const { data: pot } = await db.from("pots").select("market").eq("player_id", req.uid).maybeSingle();
+  const { data: pot } = await db.from("pots").select("market,level,running").eq("player_id", req.uid).maybeSingle();
   if (!pot) throw new ApiError(409, "No run");
   const p = await rpc("fail_run", { p_id: req.uid, p_fine: fineFor(marketById(pot.market)!) });
+  // caught or abandoned mid-run, or a finished pot thrown away
+  logRun(req.uid, pot.market, pot.running ? pot.level + 1 : pot.level, pot.running ? "failed" : "forfeited");
   res.json({ money: p.money });
 });
 
 runs.post("/bank", async (req, res) => {
+  const { data: pot } = await db.from("pots").select("market,level,cash").eq("player_id", req.uid).maybeSingle(); // read first: banking deletes it
   const p = await rpc("bank_pot", { p_id: req.uid });
+  if (pot) logRun(req.uid, pot.market, pot.level, "banked", Number(pot.cash));
   res.json({ money: p.money, storage: p.storage });
 });
