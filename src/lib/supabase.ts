@@ -14,6 +14,7 @@ export class ApiError extends Error {
 export async function rpc<T = any>(fn: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await db.rpc(fn, args);
   if (error) {
+    console.error(`rpc ${fn} failed:`, error.message);
     const m = error.message ?? "";
     if (/check constraint|violates|pot_exists|storage_full|no_pot|no_player|duplicate key|locked|already_unlocked|not_enough_money/i.test(m)) throw new ApiError(409, "Not allowed");
     throw new ApiError(500, "Server error");

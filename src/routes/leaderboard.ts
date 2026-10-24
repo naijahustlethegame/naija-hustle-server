@@ -22,6 +22,9 @@ export function defaultName(uid: string) {
   return `Player${String((h >>> 0) % 10000).padStart(4, "0")}`;
 }
 
+/** The database used to hand every player the name "Hustler". Treat that (and blank) as "no name picked yet". */
+const generic = (n?: string | null) => !n || !n.trim() || /^hustler$/i.test(n.trim());
+
 /**
  * Give a player a generated name if they have none yet. The database hands out sequential ones (Player0001, Player0002...)
  * through ensure_default_name (see supabase/player_numbers.sql). Until that is installed, fall back to a name made from
@@ -29,11 +32,12 @@ export function defaultName(uid: string) {
  */
 export async function ensureDefaultName(uid: string): Promise<string> {
   try {
+    const { data: cur } = await db.from("players").select("name").eq("id", uid).maybeSingle();
+    if (!cur) return "";
+    if (!generic(cur.name)) return cur.name;
+    if (cur.name) await db.from("players").update({ name: "" }).eq("id", uid); // so ensure_default_name will give a fresh one
     const r = await db.rpc("ensure_default_name", { p_id: uid });
     if (!r.error && typeof r.data === "string" && r.data) { cache = null; return r.data; }
-    const { data } = await db.from("players").select("name").eq("id", uid).maybeSingle();
-    if (!data) return "";
-    if (data.name) return data.name;
     const name = defaultName(uid);
     await db.from("players").update({ name }).eq("id", uid);
     cache = null;
@@ -58,7 +62,7 @@ leaderboard.get("/me", requireAuth, async (req, res) => {
   const { data: me, error } = await db.from("players").select("name,money").eq("id", req.uid).maybeSingle();
   if (error) throw new ApiError(500, "Server error");
   if (!me) throw new ApiError(404, "No player");
-  const money = Number(me.money), name: string = me.name || (await ensureDefaultName(req.uid)); // players from before names existed get one here
+  const money = Number(me.money), name: string = !generic(me.name) ? me.name : await ensureDefaultName(req.uid); // players from before names existed get one here
   let rank: number | null = null;
   if (name) {
     const { count, error: e2 } = await db.from("players").select("id", { count: "exact", head: true }).neq("name", "").gt("money", money);
